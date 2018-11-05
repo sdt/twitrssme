@@ -1,12 +1,12 @@
-requires 'CGI::Fast';
-requires 'Data::Dumper';
-requires 'Encode';
-requires 'Net::Curl';
-requires 'HTML::Entities';
-requires 'HTML::TreeBuilder::LibXML';
-requires 'HTML::TreeBuilder::XPath';
-requires 'LWP::ConnCache';
-requires 'LWP::Protocol::Net::Curl';
-requires 'LWP::UserAgent';
-requires 'POSIX';
-requires 'Readonly';
+requires $_ for qw(
+    Data::Dumper::Concise
+    Encode
+    Function::Parameters
+    HTML::Entities
+    HTML::TreeBuilder::LibXML
+    HTML::TreeBuilder::XPath
+    IO::Socket::SSL
+    Mojolicious
+    POSIX
+    Readonly
+);

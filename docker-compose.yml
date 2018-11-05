@@ -5,8 +5,10 @@ services:
     build: .
     init: true
     environment:
-      TWITRSSME_TIMEOUT_SEC: 10
+      PERL5LIB: /twitrssme/lib
+      MOJO_MODE: development
     ports:
-      - 3000:80
+      - 3000:3000
     volumes:
-      - .:/var/www/twitrssme
+      - .:/twitrssme
+    command: morbo -v -w bin -w lib ./bin/twitrssmojo

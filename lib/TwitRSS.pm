@@ -1,81 +1,52 @@
-#!/usr/bin/perl
-
 package TwitRSS;
 
-use strict;
+use 5.14.0;
 use warnings;
-use utf8;
-use 5.10.0;
 use Data::Dumper;
 use Readonly;
 use HTML::TreeBuilder::XPath;
 use HTML::TreeBuilder::LibXML;
 use HTML::Entities qw(:DEFAULT encode_entities_numeric);
-use LWP::ConnCache; 
-use LWP::UserAgent;
-use LWP::Protocol::Net::Curl;
-use CGI::Fast;
 use Encode;
 use POSIX qw(strftime);
 use Exporter qw(import);
+use Function::Parameters qw(:strict);
 
-our @EXPORT = qw(fetch_user_feed fetch_search_feed items_from_feed display_feed err $TWITTER_BASEURL);
-
-binmode STDOUT, 'utf8';
-binmode STDIN, 'utf8';
-
-HTML::TreeBuilder::LibXML->replace_original();
+our @EXPORT = qw(user_feed_url search_feed_url items_from_feed render_feed err $TWITTER_BASEURL);
 
 Readonly our $TWITTER_BASEURL    => 'https://twitter.com';
 Readonly my  $MAX_AGE            => 3600;
 
-my $browser = LWP::UserAgent->new;
-
-$browser->agent('Mozilla/5.0');
-$browser->conn_cache(LWP::ConnCache->new(5));
-$browser->timeout($ENV{TWITRSSME_TIMEOUT_SEC} || 2);
+HTML::TreeBuilder::LibXML->replace_original();
 
 # fetch user feed
-sub fetch_user_feed {
-  my $user = shift;
-  my $replies = shift;
+fun user_feed_url($user, $replies = undef) {
+  # TODO: fixup $user?
+  $user = lc $user;
+  $user =~ s/@|\s|\?|%40//g;
+
   my $url = "$TWITTER_BASEURL/$user";
   $url .= "/with_replies" if $replies;
 
-  my $response = $browser->get($url);
-  unless ($response->is_success) {
-    err('Can&#8217;t screenscrape Twitter: ' . $response->message,$response->code);
-    return;
-  }
-  return $response->content;
+  return $url;
 }
 
-# fetch search feed
-sub fetch_search_feed {
-  my $term = shift;
-  $term =~ s{^#}{};
-  $term =~ s{^%23}{};
+fun search_feed_url($term) {
+  $term =~ s/^#//;
+  $term =~ s/^%23//;
 
   my $url = "$TWITTER_BASEURL/search?f=tweets&vertical=default&q=$term&src=typd";
-
+  return $url;
 # TODO: Support hashtags
 #  if ($term =~ m{^#}) {
 #    $url = "$TWITTER_BASEURL/hashtag/$term?src=tren";
 #  }
-
-  my $response = $browser->get($url);
-  unless ($response->is_success) {
-    err('Can&#8217;t screenscrape Twitter: ' . $response->message,$response->code);
-    return;
-  }
-  return $response->content;
 }
 
 # parse search or user feed content, build up items array
 # assumption: twitter keeps its tweet markup the same in searches and user feeds
 # if not split this into 2 subs
-sub items_from_feed {
-  my $content = shift;
+fun items_from_feed($content) {
   my @items;
 
   my $tree= HTML::TreeBuilder::XPath->new;
@@ -84,17 +55,17 @@ sub items_from_feed {
   #say "called";
   #print Dumper $tweets;
   if ($tweets) {
-    for my $li (@$tweets) {    
-      my $tweet = $li->findnodes('./div' 
-        . class_contains("js-stream-tweet") 
+    for my $li (@$tweets) {
+      my $tweet = $li->findnodes('./div'
+        . class_contains("js-stream-tweet")
       )->[0]
       ;
       next unless $tweet;
-      my $header = $tweet->findnodes('./div/div' 
-        . class_contains("stream-item-header") 
-        . "/a" 
+      my $header = $tweet->findnodes('./div/div'
+        . class_contains("stream-item-header")
+        . "/a"
         . class_contains("js-action-profile"))->[0];
-      my $bd   = $tweet->findnodes( './div/div/p' 
+      my $bd   = $tweet->findnodes( './div/div/p'
         . class_contains("js-tweet-text")
       )->[0];
       my $body = "<![CDATA[" . encode_entities($bd->as_HTML,'^\n\x20-\x25\x27-\x7e"') . "]]>";
@@ -106,10 +77,10 @@ sub items_from_feed {
       $body=~s{</?span[^>]*>}{}gi;
       $body=~s{</?s[^>]*>}{}gi;
       $body=~s{data-[\w\-]+="[^"]+"}{}gi; # validator doesn't like data-aria markup that we get from twitter
-      my $avatar = $header->findvalue('./img' . class_contains("avatar") . "/\@src"); 
-      my $fst_img_a = $tweet->findnodes( './div//div' 
+      my $avatar = $header->findvalue('./img' . class_contains("avatar") . "/\@src");
+      my $fst_img_a = $tweet->findnodes( './div//div'
         . class_contains("js-adaptive-photo"))->[0];
-      $fst_img_a = $tweet->findnodes( './div/div/div' 
+      $fst_img_a = $tweet->findnodes( './div/div/div'
         . class_contains("OldMedia")
         . "/div/div/div")->[0] unless $fst_img_a;
       my $fst_img="";
@@ -127,12 +98,12 @@ sub items_from_feed {
       my $title = enctxt($bd->as_text);
       $title=~s{&nbsp;}{}gi;
       $title=~s{http}{ http}; # links in title lose space
-      my $uri = $TWITTER_BASEURL . $tweet->findvalue('@data-permalink-path');  
+      my $uri = $TWITTER_BASEURL . $tweet->findvalue('@data-permalink-path');
       my $timestamp = $tweet->findnodes('./div/div'
         . class_contains("stream-item-header")
-        . '/small/a' 
+        . '/small/a'
         . class_contains("tweet-timestamp"))->[0]->findvalue('./span/@data-time'
-      );  
+      );
 
       my $pub_date = strftime("%a, %d %b %Y %H:%M:%S %z", localtime($timestamp));
 
@@ -149,39 +120,30 @@ sub items_from_feed {
     }
   }
   else {
-    $tree->delete; 
+    $tree->delete;
     err("Can't gather tweets for that search",404);
-    next;
+    return;
   }
-  $tree->delete; 
-  @items;
+  $tree->delete;
+  return \@items;
 }
 
 # print an rss feed, with header
-sub display_feed {
-  my $feed_url = shift;
-  my $feed_title = shift;
-  my $twitter_url = shift;
-  my @items = @_;
-  print<<ENDHEAD
-Content-type: application/rss+xml
-Cache-control: public, max-age=$MAX_AGE
-Access-Control-Allow-Origin: *
-
+fun render_feed($feed_url, $feed_title, $twitter_url, $items) {
+  my $out = <<"ENDHEAD";
 <?xml version="1.0" encoding="UTF-8"?>
 <rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:georss="http://www.georss.org/georss" xmlns:twitter="http://api.twitter.com" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
   <channel>
-    <atom:link href="$feed_url" rel="self" type="application/rss+xml" /> 
+    <atom:link href="$feed_url" rel="self" type="application/rss+xml" />
     <title>$feed_title</title>
     <link>$twitter_url</link>
     <description>$feed_title</description>
     <language>en-us</language>
     <ttl>40</ttl>
 ENDHEAD
-  ;
 
-  for (@items) {
-    print<<ENDITEM
+  for (@$items) {
+    $out .= <<"ENDITEM";
     <item>
       <title>$_->{title}</title>
       <dc:creator>$_->{fullname} ($_->{username})</dc:creator>
@@ -193,27 +155,24 @@ ENDHEAD
       <twitter:place/>
     </item>
 ENDITEM
-    ;
   }
 
-  print<<ENDRSS
+  $out .= <<"ENDRSS";
   </channel>
-</rss>      
+</rss>
 ENDRSS
-  ;
 
+  return $out;
 }
 
 # convenience: Encode entities
-sub enctxt {
-  my $text=shift;
-  encode_entities_numeric(decode_entities($text));
+fun enctxt($text) {
+  return encode_entities_numeric(decode_entities($text));
 }
 
 # convenience: Make XPATH class detection nicer
-sub class_contains {
-  my $classname = shift;
-  "[contains(concat(' ',normalize-space(\@class),' '),' $classname ')]";
+fun class_contains($classname) {
+  return "[contains(concat(' ',normalize-space(\@class),' '),' $classname ')]";
 }
 
 # exit, printing an error

@@ -1,0 +1,36 @@
+#!/usr/bin/env perl
+
+use 5.22.0;
+
+use Mojolicious::Lite;
+use Mojo::Log               qw( );
+use Mojo::UserAgent         qw( );
+use TwitRSS;
+use Function::Parameters    qw( :strict );
+
+my $self_base = 'http://twitrss.me/user';
+
+my $ua = Mojo::UserAgent->new;
+my $log = Mojo::Log->new;
+
+get '/user/:username' => fun($c) {
+    for my $method (qw( debug info warn error fatal )) {
+        $log->$method(uc $method);
+    }
+    my $user = $c->param('username');
+    my $twitter_url   = user_feed_url($user);
+    my $feed_title = "Twitter search for \@$user";
+    my $feed_url   = "$self_base/$user";
+
+    $ua->get_p($twitter_url)->then(fun ($tx) {
+        my $content = $tx->result->body;
+        my $items = items_from_feed($content);
+        my $rss = render_feed($feed_url, $feed_title, $twitter_url, $items);
+        $c->render(format => 'rss+xml', data => $rss);
+    })->catch(fun($err) {
+        say STDERR "WHOOPS: $err";
+        $c->render(text => $err);
+    })->wait;
+};
+
+app->start;
