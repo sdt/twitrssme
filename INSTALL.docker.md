@@ -26,6 +26,14 @@ To run it in the background, add the `--detach` flag.
 
 That's all you need. Your TwitRSS.me server will be available on http://localhost:3000/ .
 
+### Setting a custom domain
+
+By default, the twitrssme container will report itself as running at http://twitrss.me. You can customise this with the `TWITRSSME_DOMAIN` environment variable.
+
+eg.
+
+  `docker run --rm --detach --port 3000:80 --env TWITRSSME_DOMAIN http://my.domain.com:3000 twitrssme`
+
 # Running TwitRSS.me with Docker Compose
 
 A `docker-compose.yml` is provided which mounts the local directory to `/var/www/twitrssme` in the container. This is handy for development as any local changes are available immediately in the running container, with no image rebuild neessary.

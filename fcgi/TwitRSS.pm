@@ -219,13 +219,14 @@ sub class_contains {
 # exit, printing an error
 sub err {
   my ($msg,$status) = (shift,shift);
+  my $url = $ENV{TWITRSSME_DOMAIN} // 'http://twitrss.me';
   print<<ENDHEAD
 Content-type: text/html
 Status: $status
 Cache-control: max-age=86400
-Refresh: 10; url=http://twitrss.me
+Refresh: 10; url=$url
 
-<html><head></head><body><h2>ERR: $msg</h2><p>Redirecting you back to <a href="http://twitrss.me">TwitRSS.me</a> in a few seconds. You might have spelled the username wrong or something</p></body></html>
+<html><head></head><body><h2>ERR: $msg</h2><p>Redirecting you back to <a href="$url">TwitRSS.me</a> in a few seconds. You might have spelled the username wrong or something</p></body></html>
 ENDHEAD
   ;
 }

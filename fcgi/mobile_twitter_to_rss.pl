@@ -23,7 +23,8 @@ binmode STDIN, 'utf8';
 HTML::TreeBuilder::LibXML->replace_original();
 
 Readonly my $BASEURL    => 'https://mobile.twitter.com';
-Readonly my $OWNBASEURL => 'http://twitrss.me/twitter_user_to_rss';
+Readonly my $OWNDOMAIN  => $ENV{TWITRSSME_DOMAIN} // 'http://twitrss.me';
+Readonly my $OWNBASEURL => "$OWNDOMAIN/twitter_user_to_rss';
 my $browser = LWP::UserAgent->new;
 $browser->agent('Mozilla/5.0');# (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.113 Safari/537.36');
 $browser->default_header('Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
@@ -252,9 +253,9 @@ sub err {
 Content-type: text/html
 Status: $status
 Cache-control: max-age=86400
-Refresh: 10; url=http://twitrss.me
+Refresh: 10; url=$OWNDOMAIN
 
-<html><head></head><body><h2>ERR: $msg</h2><p>Redirecting you back to <a href="http://twitrss.me">TwitRSS.me</a> in a few seconds. You might have spelled the username wrong or something</p></body></html>
+<html><head></head><body><h2>ERR: $msg</h2><p>Redirecting you back to <a href="$OWNDOMAIN">TwitRSS.me</a> in a few seconds. You might have spelled the username wrong or something</p></body></html>
 ENDHEAD
 ;
 }
